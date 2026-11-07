@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import streamlit as st
 
-# 페이지 기본 설정 (와이드 모드, 다크 테마 느낌)
+# 페이지 기본 설정
 st.set_page_config(
     page_title="DRIVER MONEY - 대리·로드탁송 통합 관리",
     page_icon="🚗",
@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# [디자인 및 스타일 적용] 사이버펑크 글래스모피즘 CSS
+# [디자인 시스템 표준 v1.0] 사이버펑크 & 글래스모피즘 CSS 스타일링
 # -----------------------------------------------------------------------------
 st.markdown(
     """
@@ -24,13 +24,27 @@ st.markdown(
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
     }
     
-    /* 사이드바 스타일링 */
+    /* 사이드바 스타일링 및 기본 라디오 마커 숨기기 */
     [data-testid="stSidebar"] {
         background-color: #0F172A;
         border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
+    
+    /* Streamlit 라디오 버튼의 동그라미 기본 아이콘 제거 및 깔끔한 배치 */
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
+        background-color: rgba(30, 41, 59, 0.5);
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-bottom: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: all 0.3s ease;
+    }
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover {
+        background-color: rgba(139, 92, 246, 0.2);
+        border-color: #8B5CF6;
+    }
 
-    /* 입력창(Input, Select) 표준 스타일: 순백색 배경, 검정 굵은 글씨 */
+    /* 입력창(Input, Select) 표준: 순백색 배경, 검정 굵은 글씨 */
     input, select, textarea {
         background-color: #FFFFFF !important;
         color: #000000 !important;
@@ -39,7 +53,6 @@ st.markdown(
         border: 1px solid #CBD5E1 !important;
     }
     
-    /* Streamlit 입력 컴포넌트 내부 맞춤 */
     .stTextInput input, .stSelectbox select, .stDateInput input, .stNumberInput input {
         background-color: #FFFFFF !important;
         color: #000000 !important;
@@ -57,7 +70,7 @@ st.markdown(
         margin-bottom: 16px;
     }
 
-    /* 강조 텍스트 */
+    /* 통계 타이틀 및 값 */
     .metric-title {
         color: #CBD5E1;
         font-size: 0.9rem;
@@ -126,12 +139,13 @@ if "expenses" not in st.session_state:
 # [사이드바 메뉴 구성]
 # -----------------------------------------------------------------------------
 st.sidebar.markdown(
-    "<h2 style='color: #8B5CF6; text-align: center;'>🚗 DRIVER MONEY</h2>",
+    "<h2 style='color: #8B5CF6; text-align: center; margin-bottom:"
+    " 0;'>🚗 DRIVER MONEY</h2>",
     unsafe_allow_html=True,
 )
 st.sidebar.markdown(
-    "<p style='text-align: center; color: #CBD5E1; font-size: 0.85rem;'>대리·로드탁송"
-    " 통합 관리 시스템</p>",
+    "<p style='text-align: center; color: #CBD5E1; font-size: 0.8rem;'>"
+    "대리·로드탁송 통합 관리 시스템</p>",
     unsafe_allow_html=True,
 )
 st.sidebar.markdown("---")
@@ -148,11 +162,12 @@ menu = st.sidebar.radio(
         "📈 수익 분석",
         "⚙️ 설정 및 백업",
     ],
+    label_visibility="collapsed",
 )
 
-# 현재 날짜 안전 표시 (KST 기준 문자열 처리)
 today_str = datetime.date.today().strftime("%Y-%m-%d")
-st.sidebar.markdown(f"<p style='text-align: center; color: #94A3B8; font-size: 0.8rem;'>오늘 날짜 (KST): {today_str}</p>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"<p style='text-align: center; color: #94A3B8; font-size: 0.75rem;'>오늘 날짜 (KST): {today_str}</p>", unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # 1. 📊 대시보드
@@ -161,15 +176,12 @@ if menu == "📊 대시보드":
   st.markdown("## 📊 실시간 운행 및 정산 대시보드")
   st.markdown("오늘의 운행 성과와 미수금 현황을 한눈에 확인하세요.")
 
-  # 계산 로직
   total_trips = len(st.session_state.trips)
   total_freight = sum(t["freight_fee"] for t in st.session_state.trips)
   total_fuel_pending = sum(
       t["fuel_fee"] for t in st.session_state.trips if t["status"] != "입금 완료"
   )
-  paid_amount = sum(
-      p["amount"] for p in st.session_state.payments
-  )
+  paid_amount = sum(p["amount"] for p in st.session_state.payments)
   unpaid_amount = (total_freight + sum(t["fuel_fee"] for t in st.session_state.trips)) - paid_amount
 
   col1, col2, col3, col4 = st.columns(4)
@@ -219,21 +231,19 @@ if menu == "📊 대시보드":
     df_trips = pd.DataFrame(st.session_state.trips)
     st.dataframe(df_trips, use_container_width=True)
   else:
-    st.info("등록된 운행 내역이 없습니다. 왼쪽 메뉴에서 운행을 등록해주세요.")
+    st.info("등록된 운행 내역이 없습니다.")
 
 # -----------------------------------------------------------------------------
 # 2. 📝 빠른 운행 등록
 # -----------------------------------------------------------------------------
 elif menu == "📝 빠른 운행 등록":
   st.markdown("## 📝 30초 간편 운행 등록")
-  st.markdown("탁송비와 주유비를 분리하여 빠르고 정확하게 입력하세요.")
-
   with st.form("trip_form"):
     col1, col2 = st.columns(2)
     with col1:
       trip_date = st.date_input("운행 날짜", datetime.date.today())
       category = st.selectbox("운행 종류", ["로드탁송", "대리운전", "업체 배정 탁송", "기타"])
-      company = st.text_input("업체명 / 플랫폼", placeholder="예: 한국로지스, 카카오T")
+      company = st.text_input("업체명 / 플랫폼", placeholder="예: 한국로지스")
       start_loc = st.text_input("출발지", placeholder="예: 서울 강남구")
       end_loc = st.text_input("도착지", placeholder="예: 부산 해운대구")
 
@@ -271,7 +281,6 @@ elif menu == "📋 운행 내역 및 정산":
     df = pd.DataFrame(st.session_state.trips)
     st.dataframe(df, use_container_width=True)
     
-    # 정산 요청 문자 메시지 자동 생성기
     st.markdown("### 💬 정산 요청 문자 자동 생성")
     selected_company = st.selectbox("문자를 보낼 업체 선택", df["company"].unique())
     target_trip = next((t for t in st.session_state.trips if t["company"] == selected_company), None)
@@ -287,8 +296,6 @@ elif menu == "📋 운행 내역 및 정산":
 # -----------------------------------------------------------------------------
 elif menu == "⛽ 주유비 환급 관리":
   st.markdown("## ⛽ 주유비 선결제 및 환급 대기 관리")
-  st.markdown("기사가 먼저 결제하고 아직 돌려받지 못한 주유비 내역을 모아서 보여줍니다.")
-  
   fuel_records = [t for t in st.session_state.trips if t["fuel_fee"] > 0]
   if fuel_records:
     df_fuel = pd.DataFrame(fuel_records)[["date", "company", "start_loc", "end_loc", "fuel_fee", "status"]]
@@ -371,9 +378,6 @@ elif menu == "📈 수익 분석":
 # -----------------------------------------------------------------------------
 elif menu == "⚙️ 설정 및 백업":
   st.markdown("## ⚙️ 데이터 백업 및 앱 설정")
-  st.markdown("모든 운행 및 정산 데이터를 JSON 파일로 백업하거나 복원할 수 있습니다.")
-  
-  # 데이터 다운로드 버튼
   data_json = json.dumps({
       "trips": st.session_state.trips,
       "payments": st.session_state.payments,
@@ -386,6 +390,3 @@ elif menu == "⚙️ 설정 및 백업":
       file_name=f"driver_money_backup_{today_str}.json",
       mime="application/json",
   )
-  
-  st.markdown("---")
-  st.info("💡 **팁:** Streamlit Cloud에서 브라우저를 새로고침해도 세션 상태에 안전하게 유지되며, 정기적으로 백업 파일을 다운로드해 두시면 데이터 유실을 완벽히 방지할 수 있습니다.")
