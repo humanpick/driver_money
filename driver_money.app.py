@@ -1,426 +1,357 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
+import datetime
+import json
 
-# 1. 페이지 기본 설정 (와이드 모드 필수, 다크 배경)
+# -----------------------------------------------------------------------------
+# 1. 페이지 및 테마 설정 (순수 Streamlit 환경 최적화)
+# -----------------------------------------------------------------------------
 st.set_page_config(
-    page_title="DRIVER MONEY - 프리미엄 탁송 가계부",
+    page_title="DRIVER MONEY - 대리·로드탁송 통합 관리",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# 2. Streamlit 기본 UI 완벽 숨김 처리 (웹앱 전체화면화)
+# 사이버펑크 & 글래스모피즘 CSS (스트림릿 네이티브 요소 커스텀)
 st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        .block-container {
-            padding: 0rem !important;
-            max-width: 100% !important;
-            margin: 0 !important;
-        }
-        iframe {
-            border: none;
-            height: 100vh !important;
-            width: 100vw !important;
-        }
-        ::-webkit-scrollbar {
-            display: none;
-        }
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #0B1120;
-        }
-    </style>
+<style>
+    /* 전체 배경 설정 */
+    .stApp {
+        background-color: #0B1120;
+        color: #f1f5f9;
+        font-family: 'Pretendard', sans-serif;
+    }
+    
+    /* 사이드바 스타일링 */
+    [data-testid="stSidebar"] {
+        background-color: #0F172A !important;
+        border-right: 1px solid rgba(255,255,255,0.05);
+    }
+    
+    /* 라디오 버튼(메뉴) 카드 형태로 변경 */
+    div.stRadio > div[role="radiogroup"] > label {
+        background: rgba(30, 41, 59, 0.4);
+        padding: 10px 15px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.05);
+        margin-bottom: 8px;
+        transition: all 0.3s;
+        cursor: pointer;
+    }
+    div.stRadio > div[role="radiogroup"] > label:hover {
+        background: rgba(139, 92, 246, 0.2);
+        border-color: #8B5CF6;
+    }
+    /* 라디오 버튼의 기본 원형 마커 숨김 */
+    div.stRadio > div[role="radiogroup"] > label > div:first-child { display: none !important; }
+    
+    /* 메트릭 카드 (통계) 스타일 */
+    [data-testid="stMetricValue"] {
+        color: #fff !important;
+        font-size: 1.8rem !important;
+        font-weight: 900 !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #94a3b8 !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+    }
+    .metric-container {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    
+    /* 입력 폼 스타일 (고대비) */
+    .stTextInput input, .stSelectbox select, .stNumberInput input, .stDateInput input {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-weight: 600 !important;
+        border-radius: 8px !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    
+    /* 버튼 스타일 */
+    .stButton > button {
+        background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+        color: white !important;
+        font-weight: 800 !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1rem !important;
+        transition: transform 0.2s;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139,92,246,0.4);
+    }
+    
+    /* 데이터프레임 (표) 헤더 커스텀 */
+    th {
+        background-color: #1e293b !important;
+        color: #94a3b8 !important;
+    }
+</style>
 """, unsafe_allow_html=True)
 
-# 3. 완벽하게 작동하는 React UI 원본 코드 (모달창 멈춤 버그 완벽 수정본)
-react_html_code = """
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DRIVER MONEY</title>
+# -----------------------------------------------------------------------------
+# 2. 데이터 초기화 (Session State 기반)
+# -----------------------------------------------------------------------------
+if 'trips' not in st.session_state:
+    st.session_state.trips = [
+        {"id": "TRIP-1001", "date": "2026-11-07", "type": "로드탁송", "company": "SK로드탁송", "from_loc": "서울 강남구", "to_loc": "부산 해운대구", "freight": 180000, "fuel": 70000, "paid_freight": 0, "paid_fuel": 0, "status": "정산 대기", "due_date": "2026-11-14"},
+        {"id": "TRIP-1002", "date": "2026-11-07", "type": "대리운전", "company": "카카오대리", "from_loc": "성남 판교", "to_loc": "인천 송도", "freight": 45000, "fuel": 0, "paid_freight": 45000, "paid_fuel": 0, "status": "정산 완료", "due_date": "2026-11-07"},
+        {"id": "TRIP-1003", "date": "2026-11-05", "type": "로드탁송", "company": "오토원탁송", "from_loc": "경기 수원", "to_loc": "대전 유성구", "freight": 200000, "fuel": 50000, "paid_freight": 100000, "paid_fuel": 0, "status": "부분 입금", "due_date": "2026-11-06"}
+    ]
+if 'expenses' not in st.session_state:
+    st.session_state.expenses = [
+        {"id": "e1", "date": "2026-11-07", "category": "통행료", "amount": 15400, "memo": "서울-부산 톨게이트"},
+        {"id": "e2", "date": "2026-11-07", "category": "복귀 교통비", "amount": 32000, "memo": "KTX 부산-서울"}
+    ]
+
+# 핵심 통계 계산 함수
+def calculate_stats():
+    stats = {
+        'today_count': 0, 'today_target': 0, 'today_deposit': 0,
+        'unpaid_freight': 0, 'unpaid_fuel': 0, 'total_income': 0, 'total_expense': 0
+    }
+    today = "2026-11-07"
+    for t in st.session_state.trips:
+        stats['unpaid_freight'] += (t['freight'] - t['paid_freight'])
+        stats['unpaid_fuel'] += (t['fuel'] - t['paid_fuel'])
+        stats['total_income'] += t['paid_freight']
+        if t['date'] == today:
+            stats['today_count'] += 1
+            stats['today_target'] += (t['freight'] + t['fuel'])
+            stats['today_deposit'] += (t['paid_freight'] + t['paid_fuel'])
+            
+    for e in st.session_state.expenses:
+        stats['total_expense'] += e['amount']
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    stats['total_unpaid'] = stats['unpaid_freight'] + stats['unpaid_fuel']
+    stats['net_profit'] = stats['total_income'] - stats['total_expense']
+    return stats
 
-    <!-- Pretendard Font -->
-    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+stats = calculate_stats()
 
-    <!-- React 18 -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+# -----------------------------------------------------------------------------
+# 3. 사이드바 네비게이션
+# -----------------------------------------------------------------------------
+with st.sidebar:
+    st.markdown("<h2 style='text-align: center; color: #8B5CF6; margin-bottom: 0;'>🚗 DRIVER MONEY</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 0.8rem; margin-top: 0;'>Pro Consignment OS</p>", unsafe_allow_html=True)
+    st.markdown("---")
     
-    <!-- Babel (브라우저 실시간 번역기) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    menu = st.radio(
+        "메뉴 선택",
+        ["📊 대시보드", "📝 빠른 운행 등록", "📋 전체 운행 내역", "💰 입금 처리 및 미수금", "⛽ 주유비 환급 관리", "💸 지출 관리", "📈 수익 분석", "💾 데이터 백업"],
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("---")
+    st.markdown("<p style='text-align: center; color: #64748b; font-size: 0.75rem;'>KST 2026-11-07</p>", unsafe_allow_html=True)
 
-    <!-- Lucide React 아이콘 (모달 멈춤 버그 해결의 핵심 라이브러리) -->
-    <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
 
-    <style>
-        body { background-color: #0B1120; margin: 0; padding: 0; color: #f1f5f9; overflow-x: hidden; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0f172a; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+# -----------------------------------------------------------------------------
+# 4. 메인 화면 렌더링 로직 (메뉴별 기능)
+# -----------------------------------------------------------------------------
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+# --- [메뉴 1] 대시보드 ---
+if menu == "📊 대시보드":
+    st.markdown("## 📊 실시간 통합 대시보드")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+        st.metric("오늘 운행 건수", f"{stats['today_count']}건")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<div class="metric-container" style="border-color: rgba(236,72,153,0.3);">', unsafe_allow_html=True)
+        st.metric("현재 총 미수금", f"{stats['total_unpaid']:,}원")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<div class="metric-container" style="border-color: rgba(245,158,11,0.3);">', unsafe_allow_html=True)
+        st.metric("주유비 환급대기", f"{stats['unpaid_fuel']:,}원")
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col4:
+        st.markdown('<div class="metric-container" style="border-color: rgba(16,185,129,0.3);">', unsafe_allow_html=True)
+        st.metric("이번달 순수익", f"{stats['net_profit']:,}원")
+        st.markdown('</div>', unsafe_allow_html=True)
         
-        // 아이콘 추출 (안정성 확보)
-        const { 
-            LayoutDashboard, PlusCircle, History, TrendingUp, Fuel, CreditCard, 
-            AlertTriangle, Receipt, Building2, Bell, PieChart, Calendar, Users, 
-            Download, Settings, Search, Filter, CheckCircle2, XCircle, Clock, 
-            Phone, Send, Copy, ChevronRight, Menu, X, Plus, RefreshCw, Trash2, 
-            Edit, DollarSign, ArrowUpRight, Car 
-        } = window.lucideReact;
+    st.markdown("### 🚀 최근 등록된 운행 내역")
+    df_trips = pd.DataFrame(st.session_state.trips)
+    if not df_trips.empty:
+        # 데이터프레임 컬럼 순서 및 이름 예쁘게 변경하여 출력
+        display_df = df_trips[['date', 'company', 'from_loc', 'to_loc', 'freight', 'fuel', 'status']].copy()
+        display_df.columns = ['일자', '업체명', '출발지', '도착지', '탁송비(원)', '선결제주유비(원)', '정산상태']
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("등록된 운행 내역이 없습니다.")
 
-        // --- 초기 샘플 데이터 ---
-        const INITIAL_COMPANIES = [
-            { id: 'c1', name: 'SK로드탁송', contact: '010-1234-5678', cycle: '매주 금요일', defaultFee: 180000 },
-            { id: 'c2', name: '카카오대리', contact: '1588-0000', cycle: '당일 정산', defaultFee: 45000 },
-            { id: 'c3', name: '오토원탁송', contact: '010-9876-5432', cycle: '매월 10일', defaultFee: 220000 },
-        ];
 
-        const INITIAL_TRIPS = [
-            {
-                id: 'TRIP-1001', date: '2026-11-07', startTime: '14:00', endTime: '17:30',
-                type: '로드탁송', company: 'SK로드탁송', customer: '홍길동', phone: '010-8888-9999',
-                vehicleNo: '12가 3456', vehicleType: '제네시스 G80', from: '서울 강남구', to: '부산 해운대구',
-                freightFee: 180000, fuelFee: 70000, fuelPaidBy: 'driver_prepaid',
-                dueDate: '2026-11-14', status: '정산 대기', paidFreight: 0, paidFuel: 0,
-                memo: '주유비 7만원선결제 (영수증 첨부완료)'
-            },
-            {
-                id: 'TRIP-1002', date: '2026-11-07', startTime: '20:00', endTime: '22:15',
-                type: '대리운전', company: '카카오대리', customer: '이몽룡', phone: '010-2222-3333',
-                vehicleNo: '56나 7890', vehicleType: '그랜저 IG', from: '성남 판교', to: '인천 송도',
-                freightFee: 45000, fuelFee: 0, fuelPaidBy: 'included',
-                dueDate: '2026-11-07', status: '정산 완료', paidFreight: 45000, paidFuel: 0,
-                memo: '당일 정산완료'
-            },
-            {
-                id: 'TRIP-1003', date: '2026-11-05', startTime: '09:00', endTime: '12:00',
-                type: '로드탁송', company: '오토원탁송', customer: '성춘향', phone: '010-7777-1111',
-                vehicleNo: '77다 1234', vehicleType: 'K8 Hybrid', from: '경기 수원', to: '대전 유성구',
-                freightFee: 200000, fuelFee: 50000, fuelPaidBy: 'driver_prepaid',
-                dueDate: '2026-11-06', status: '부분 입금', paidFreight: 100000, paidFuel: 0,
-                memo: '탁송비 1차 10만원 입금됨, 잔액 10만+주유 5만 미수'
+# --- [메뉴 2] 빠른 운행 등록 ---
+elif menu == "📝 빠른 운행 등록":
+    st.markdown("## ⚡ 30초 빠른 운행 등록")
+    with st.form("trip_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            t_date = st.date_input("운행 일자", datetime.date(2026,11,7))
+            t_type = st.selectbox("운행 종류", ["로드탁송", "대리운전", "개인 직거래", "기타"])
+            t_company = st.text_input("업체명", placeholder="예: SK로드탁송")
+            t_from = st.text_input("출발지", placeholder="예: 서울 강남")
+        with col2:
+            t_to = st.text_input("도착지", placeholder="예: 부산 해운대")
+            t_freight = st.number_input("탁송비 (원)", value=150000, step=1000)
+            t_fuel = st.number_input("기사 선결제 주유비 (원)", value=0, step=1000)
+            t_due = st.date_input("정산 예정일", datetime.date(2026,11,14))
+            
+        submit = st.form_submit_button("운행 내역 저장하기", use_container_width=True)
+        if submit:
+            new_trip = {
+                "id": f"TRIP-{datetime.datetime.now().strftime('%H%M%S')}",
+                "date": t_date.strftime("%Y-%m-%d"),
+                "type": t_type, "company": t_company, "from_loc": t_from, "to_loc": t_to,
+                "freight": int(t_freight), "fuel": int(t_fuel),
+                "paid_freight": 0, "paid_fuel": 0,
+                "status": "정산 대기", "due_date": t_due.strftime("%Y-%m-%d")
             }
-        ];
+            st.session_state.trips.insert(0, new_trip)
+            st.success(f"{t_company} 운행 내역이 성공적으로 저장되었습니다!")
 
-        const INITIAL_EXPENSES = [
-            { id: 'e1', date: '2026-11-07', category: '통행료', amount: 15400, memo: '서울-부산 톨게이트' },
-            { id: 'e2', date: '2026-11-07', category: '복귀 교통비', amount: 32000, memo: 'KTX 부산-서울' },
-        ];
 
-        function App() {
-            // 브라우저 캐시(localStorage)를 활용한 데이터 유지
-            const [trips, setTrips] = useState(() => {
-                const saved = localStorage.getItem('dm_trips');
-                return saved ? JSON.parse(saved) : INITIAL_TRIPS;
-            });
-            const [expenses, setExpenses] = useState(() => {
-                const saved = localStorage.getItem('dm_expenses');
-                return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
-            });
-            const [companies, setCompanies] = useState(() => {
-                const saved = localStorage.getItem('dm_companies');
-                return saved ? JSON.parse(saved) : INITIAL_COMPANIES;
-            });
+# --- [메뉴 3] 전체 운행 내역 ---
+elif menu == "📋 전체 운행 내역":
+    st.markdown("## 📋 전체 운행 및 정산 내역")
+    df_trips = pd.DataFrame(st.session_state.trips)
+    if not df_trips.empty:
+        # 미수금 계산 컬럼 추가
+        df_trips['unpaid_total'] = (df_trips['freight'] - df_trips['paid_freight']) + (df_trips['fuel'] - df_trips['paid_fuel'])
+        
+        display_df = df_trips[['date', 'company', 'from_loc', 'to_loc', 'freight', 'fuel', 'status', 'unpaid_total']].copy()
+        display_df.columns = ['일자', '업체명', '출발지', '도착지', '탁송비', '주유비', '상태', '남은미수금총액']
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("등록된 내역이 없습니다.")
 
-            const [activeTab, setActiveTab] = useState('dashboard');
+
+# --- [메뉴 4] 입금 처리 및 미수금 ---
+elif menu == "💰 입금 처리 및 미수금":
+    st.markdown("## 💳 입금 등록 및 미수금 관리")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### 📥 실시간 입금 처리")
+        # 미수금이 있는 운행만 선택옵션으로 제공
+        unpaid_trips = [t for t in st.session_state.trips if (t['freight']-t['paid_freight'] + t['fuel']-t['paid_fuel']) > 0]
+        
+        if unpaid_trips:
+            with st.form("deposit_form"):
+                trip_options = {t['id']: f"[{t['company']}] {t['from_loc']}→{t['to_loc']} (미수금: {(t['freight']-t['paid_freight'])+(t['fuel']-t['paid_fuel']):,}원)" for t in unpaid_trips}
+                selected_trip_id = st.selectbox("입금 대상 운행 선택", options=list(trip_options.keys()), format_func=lambda x: trip_options[x])
+                
+                d_freight = st.number_input("탁송비 입금액 (원)", value=0, step=1000)
+                d_fuel = st.number_input("주유비 환급 입금액 (원)", value=0, step=1000)
+                
+                d_submit = st.form_submit_button("입금 적용하기")
+                if d_submit:
+                    for t in st.session_state.trips:
+                        if t['id'] == selected_trip_id:
+                            t['paid_freight'] += int(d_freight)
+                            t['paid_fuel'] += int(d_fuel)
+                            
+                            total_target = t['freight'] + t['fuel']
+                            total_paid = t['paid_freight'] + t['paid_fuel']
+                            
+                            if total_paid >= total_target: t['status'] = "정산 완료"
+                            elif total_paid > 0: t['status'] = "부분 입금"
+                            else: t['status'] = "정산 대기"
+                            
+                    st.success("입금이 정상적으로 반영되었습니다.")
+                    st.rerun()
+        else:
+            st.success("현재 모든 운행의 정산이 완료되었습니다! (미수금 없음)")
             
-            // 모달 상태 관리
-            const [isTripModalOpen, setIsTripModalOpen] = useState(false);
-            const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-            const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
+    with col2:
+        st.markdown("### 💬 정산 요청 문자 생성기")
+        if unpaid_trips:
+            sms_target_id = st.selectbox("문자 발송 대상 선택", options=list(trip_options.keys()), format_func=lambda x: trip_options[x], key="sms_box")
+            target = next(t for t in st.session_state.trips if t['id'] == sms_target_id)
+            unpaid_fr = target['freight'] - target['paid_freight']
+            unpaid_fu = target['fuel'] - target['paid_fuel']
             
-            const [selectedTripForSms, setSelectedTripForSms] = useState(null);
+            sms_text = f"안녕하세요 {target['company']} 담당자님.\n{target['date']} 진행한 탁송건({target['from_loc']}→{target['to_loc']}) 정산 확인 부탁드립니다.\n\n- 탁송비 미수금: {unpaid_fr:,}원\n- 주유비 환급대기: {unpaid_fu:,}원\n- 총 미정산액: {unpaid_fr + unpaid_fu:,}원\n\n확인 후 입금 부탁드립니다. 감사합니다."
+            st.text_area("자동 생성된 문자 내용 (복사해서 카톡/문자로 보내세요)", value=sms_text, height=200)
 
-            // 데이터 자동 저장
-            useEffect(() => { localStorage.setItem('dm_trips', JSON.stringify(trips)); }, [trips]);
-            useEffect(() => { localStorage.setItem('dm_expenses', JSON.stringify(expenses)); }, [expenses]);
-            useEffect(() => { localStorage.setItem('dm_companies', JSON.stringify(companies)); }, [companies]);
 
-            // 재무 통계 자동 계산 엔진
-            const stats = useMemo(() => {
-                let todayCount = 0; let todaySettlementTarget = 0; let todayDeposit = 0;
-                let totalUnpaidFreight = 0; let totalUnpaidFuel = 0;
-                let monthlyFreightIncome = 0; let monthlyExpenses = 0;
-                const todayStr = '2026-11-07';
+# --- [메뉴 5] 주유비 환급 관리 ---
+elif menu == "⛽ 주유비 환급 관리":
+    st.markdown("## ⛽ 주유비 선결제 전용 관리")
+    fuel_trips = [t for t in st.session_state.trips if t['fuel'] > 0]
+    
+    if fuel_trips:
+        st.metric("현재 돌려받아야 할 총 주유비", f"{stats['unpaid_fuel']:,}원")
+        df_fuel = pd.DataFrame(fuel_trips)
+        df_fuel['remain_fuel'] = df_fuel['fuel'] - df_fuel['paid_fuel']
+        display_fuel = df_fuel[['date', 'company', 'from_loc', 'to_loc', 'fuel', 'paid_fuel', 'remain_fuel']].copy()
+        display_fuel.columns = ['일자', '업체명', '출발지', '도착지', '기사 선결제액', '환급받은 금액', '남은 미환급금']
+        st.dataframe(display_fuel, use_container_width=True, hide_index=True)
+    else:
+        st.info("선결제한 주유비 내역이 없습니다.")
 
-                trips.forEach(t => {
-                    const freightUnpaid = t.freightFee - t.paidFreight;
-                    const fuelUnpaid = t.fuelPaidBy === 'driver_prepaid' ? Math.max(0, t.fuelFee - t.paidFuel) : 0;
-                    totalUnpaidFreight += freightUnpaid; totalUnpaidFuel += fuelUnpaid;
-                    if (t.date === todayStr) {
-                        todayCount++;
-                        todaySettlementTarget += (t.freightFee + (t.fuelPaidBy === 'driver_prepaid' ? t.fuelFee : 0));
-                        todayDeposit += (t.paidFreight + t.paidFuel);
-                    }
-                    monthlyFreightIncome += t.paidFreight;
-                });
-                expenses.forEach(e => { monthlyExpenses += Number(e.amount || 0); });
-                const netProfit = monthlyFreightIncome - monthlyExpenses;
 
-                return { 
-                    todayCount, todaySettlementTarget, todayDeposit, 
-                    totalUnpaidFreight, totalUnpaidFuel, 
-                    totalUnpaid: totalUnpaidFreight + totalUnpaidFuel, 
-                    monthlyFreightIncome, monthlyExpenses, netProfit 
-                };
-            }, [trips, expenses]);
-
-            // 운행 등록 처리
-            const handleSaveTrip = (newTrip) => { setTrips(prev => [newTrip, ...prev]); setIsTripModalOpen(false); };
+# --- [메뉴 6] 지출 관리 ---
+elif menu == "💸 지출 관리":
+    st.markdown("## 🧾 사업 및 운행 지출 관리")
+    with st.form("expense_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            e_date = st.date_input("지출 일자", datetime.date.today())
+            e_cat = st.selectbox("지출 항목", ["통행료", "복귀 교통비", "식비", "차량 유지비", "기타"])
+        with col2:
+            e_amt = st.number_input("지출 금액 (원)", value=10000, step=1000)
+            e_memo = st.text_input("메모", placeholder="예: 톨게이트비")
+        
+        e_submit = st.form_submit_button("지출 내역 등록")
+        if e_submit:
+            st.session_state.expenses.insert(0, {
+                "id": f"EXP-{datetime.datetime.now().strftime('%H%M%S')}",
+                "date": e_date.strftime("%Y-%m-%d"),
+                "category": e_cat, "amount": int(e_amt), "memo": e_memo
+            })
+            st.success("지출 내역이 등록되었습니다!")
             
-            // 입금 등록 처리
-            const handleApplyDeposit = (tripId, freightAmt, fuelAmt) => {
-                setTrips(prev => prev.map(t => {
-                    if (t.id === tripId) {
-                        const newPaidFreight = t.paidFreight + Number(freightAmt);
-                        const newPaidFuel = t.paidFuel + Number(fuelAmt);
-                        const totalTarget = t.freightFee + (t.fuelPaidBy === 'driver_prepaid' ? t.fuelFee : 0);
-                        const totalPaid = newPaidFreight + newPaidFuel;
-                        let newStatus = '부분 입금';
-                        if (totalPaid >= totalTarget) { newStatus = '정산 완료'; } else if (totalPaid === 0) { newStatus = '정산 대기'; }
-                        return { ...t, paidFreight: newPaidFreight, paidFuel: newPaidFuel, status: newStatus };
-                    }
-                    return t;
-                }));
-                setIsDepositModalOpen(false);
-            };
+    st.markdown("### 지출 내역 목록")
+    if st.session_state.expenses:
+        st.dataframe(pd.DataFrame(st.session_state.expenses)[['date', 'category', 'amount', 'memo']], use_container_width=True, hide_index=True)
 
-            const navItems = [
-                { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-                { id: 'trip_list', label: '운행 내역', icon: History },
-                { id: 'unpaid', label: '미수금 & SMS', icon: AlertTriangle, badge: trips.filter(t => (t.freightFee - t.paidFreight + (t.fuelPaidBy==='driver_prepaid'?(t.fuelFee-t.paidFuel):0)) > 0).length },
-                { id: 'backup', label: '백업 및 엑셀', icon: Download },
-            ];
 
-            return (
-                <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans flex flex-col md:flex-row antialiased">
-                    
-                    {/* PC 좌측 사이드바 */}
-                    <aside className="hidden md:flex flex-col w-64 bg-slate-900/80 backdrop-blur-md border-r border-slate-800 p-4 shrink-0 justify-between">
-                        <div>
-                            <div className="flex items-center gap-3 px-3 py-4 mb-4 border-b border-slate-800/80">
-                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
-                                    <Car className="w-6 h-6 text-white" />
-                                </div>
-                                <div>
-                                    <h1 className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-white via-purple-200 to-pink-400 bg-clip-text text-transparent">DRIVER MONEY</h1>
-                                    <span className="text-[10px] text-purple-400 font-mono tracking-widest uppercase block">Pro Consignment OS</span>
-                                </div>
-                            </div>
-                            <nav className="space-y-1">
-                                {navItems.map((item) => {
-                                    const IconComponent = item.icon;
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => setActiveTab(item.id)}
-                                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                                                activeTab === item.id ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/20 text-white border border-purple-500/40 shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <IconComponent className={`w-4 h-4 ${activeTab === item.id ? 'text-purple-400' : 'text-slate-400'}`} />
-                                                <span>{item.label}</span>
-                                            </div>
-                                            {item.badge > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-pink-500/20 text-pink-400 font-bold border border-pink-500/30">{item.badge}</span>}
-                                        </button>
-                                    )
-                                })}
-                            </nav>
-                        </div>
-                    </aside>
+# --- [메뉴 7] 수익 분석 ---
+elif menu == "📈 수익 분석":
+    st.markdown("## 📈 이달의 순수익 분석")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("총 탁송 수입 (수령완료액)", f"{stats['total_income']:,}원")
+    col2.metric("총 사업 지출", f"{stats['total_expense']:,}원")
+    col3.metric("최종 순수익", f"{stats['net_profit']:,}원")
 
-                    {/* 메인 작업 영역 */}
-                    <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full pb-24 md:pb-8">
-                        
-                        {/* 상단 액션 버튼 */}
-                        <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-4">
-                            <div>
-                                <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                                    {navItems.find(n => n.id === activeTab)?.label || '대시보드'}
-                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 font-mono font-normal">KST 2026-11-07</span>
-                                </h2>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button onClick={() => setIsTripModalOpen(true)} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2 transform hover:-translate-y-0.5">
-                                    <Plus className="w-4 h-4" /> 운행 빠른등록
-                                </button>
-                                <button onClick={() => setIsDepositModalOpen(true)} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-200 bg-slate-800 border border-slate-700 transition-all flex items-center gap-1.5 hover:bg-slate-700 transform hover:-translate-y-0.5">
-                                    <CreditCard className="w-4 h-4 text-emerald-400" /> 입금 처리
-                                </button>
-                            </div>
-                        </header>
 
-                        {/* 1. 대시보드 탭 */}
-                        {activeTab === 'dashboard' && (
-                            <div className="space-y-6">
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 relative overflow-hidden">
-                                        <p className="text-xs font-bold text-slate-400">오늘 운행 건수</p>
-                                        <span className="text-2xl font-black text-white">{stats.todayCount}건</span>
-                                    </div>
-                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-pink-900/40 relative overflow-hidden">
-                                        <p className="text-xs font-bold text-pink-300">현재 미수금 총액</p>
-                                        <span className="text-2xl font-black text-pink-400">{stats.totalUnpaid.toLocaleString()}원</span>
-                                    </div>
-                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-amber-900/40 relative overflow-hidden">
-                                        <p className="text-xs font-bold text-amber-300">주유비 환급대기</p>
-                                        <span className="text-2xl font-black text-amber-400">{stats.totalUnpaidFuel.toLocaleString()}원</span>
-                                    </div>
-                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-emerald-900/40 relative overflow-hidden">
-                                        <p className="text-xs font-bold text-emerald-300">이번 달 실제 순수익</p>
-                                        <span className="text-2xl font-black text-emerald-400">{stats.netProfit.toLocaleString()}원</span>
-                                    </div>
-                                </div>
-
-                                <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800">
-                                    <h3 className="font-extrabold text-base text-white mb-4">최근 운행 내역</h3>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left text-xs">
-                                            <thead className="bg-slate-950/80 text-slate-400 uppercase font-mono">
-                                                <tr><th className="p-3">일자</th><th className="p-3">업체</th><th className="p-3">구간</th><th className="p-3 text-right">탁송비</th><th className="p-3 text-right">주유비</th><th className="p-3 text-center">상태</th></tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-800/60 font-medium">
-                                                {trips.slice(0, 5).map(t => (
-                                                    <tr key={t.id} className="hover:bg-slate-800/40">
-                                                        <td className="p-3 font-mono text-slate-300">{t.date}</td>
-                                                        <td className="p-3 text-white font-bold">{t.company}</td>
-                                                        <td className="p-3 text-slate-200">{t.from} → {t.to}</td>
-                                                        <td className="p-3 text-right text-purple-300 font-bold">{t.freightFee.toLocaleString()}원</td>
-                                                        <td className="p-3 text-right text-amber-300 font-bold">{t.fuelFee > 0 ? `${t.fuelFee.toLocaleString()}원` : '-'}</td>
-                                                        <td className="p-3 text-center text-emerald-400 font-bold">{t.status}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 2. 운행 내역 전체 탭 */}
-                        {activeTab === 'trip_list' && (
-                            <div className="space-y-4">
-                                {trips.map(t => {
-                                    const totalUnpaid = (t.freightFee - t.paidFreight) + (t.fuelPaidBy === 'driver_prepaid' ? (t.fuelFee - t.paidFuel) : 0);
-                                    return (
-                                        <div key={t.id} className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 backdrop-blur-xl hover:border-purple-500/30 transition-all space-y-3">
-                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 font-mono text-xs font-bold border border-purple-500/30">{t.type}</span>
-                                                    <h4 className="font-extrabold text-base text-white">{t.company}</h4><span className="text-xs text-slate-400 font-mono">({t.date})</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${t.status === '정산 완료' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-pink-500/20 text-pink-400 border border-pink-500/30'}`}>{t.status}</span>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                                                <div><span className="text-slate-400 block">운행 구간</span><p className="font-bold text-slate-200 mt-0.5">{t.from} → {t.to}</p></div>
-                                                <div><span className="text-slate-400 block">탁송비</span><p className="font-bold text-purple-300 mt-0.5">{t.freightFee.toLocaleString()}원</p></div>
-                                                <div className="text-right">
-                                                    <span className="text-slate-400 block">남은 미수금</span><span className="text-base font-black text-pink-400">{totalUnpaid.toLocaleString()}원</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-
-                        {/* 3. 미수금 확인 및 문자발송 탭 */}
-                        {activeTab === 'unpaid' && (
-                            <div className="space-y-4">
-                                {trips.filter(t => (t.freightFee - t.paidFreight + (t.fuelPaidBy==='driver_prepaid'?(t.fuelFee-t.paidFuel):0)) > 0).map(t => {
-                                    const freightUnpaid = t.freightFee - t.paidFreight;
-                                    const fuelUnpaid = t.fuelPaidBy === 'driver_prepaid' ? (t.fuelFee - t.paidFuel) : 0;
-                                    const totalUnpaid = freightUnpaid + fuelUnpaid;
-                                    return (
-                                        <div key={t.id} className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between space-y-4">
-                                            <div>
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <span className="px-2.5 py-1 rounded-lg bg-pink-500/20 text-pink-300 font-bold text-xs border border-pink-500/30">정산 예정일: {t.dueDate}</span>
-                                                    <span className="text-xs font-bold text-slate-400">{t.company}</span>
-                                                </div>
-                                                <h4 className="font-extrabold text-base text-white">{t.from} → {t.to}</h4>
-                                                <div className="mt-4 p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs">
-                                                    <div className="flex justify-between text-slate-300"><span>탁송비 미수금:</span><span className="font-bold text-purple-300">{freightUnpaid.toLocaleString()}원</span></div>
-                                                    <div className="flex justify-between text-slate-300"><span>주유비 환급 대기:</span><span className="font-bold text-amber-300">{fuelUnpaid.toLocaleString()}원</span></div>
-                                                    <div className="pt-1 border-t border-slate-800 flex justify-between text-sm font-black text-pink-400"><span>합계 미수금:</span><span>{totalUnpaid.toLocaleString()}원</span></div>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => { setSelectedTripForSms(t); setIsSmsModalOpen(true); }} className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-80 transition-all">
-                                                <Send className="w-4 h-4" /> 정산 요청 문자 복사하기
-                                            </button>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        )}
-
-                        {/* 4. 백업 및 엑셀 탭 */}
-                        {activeTab === 'backup' && (
-                            <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl space-y-4">
-                                <h3 className="font-extrabold text-base text-white">데이터 백업 (JSON)</h3>
-                                <button onClick={() => {
-                                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ trips, expenses, companies }));
-                                    const link = document.createElement('a');
-                                    link.setAttribute("href", dataStr); link.setAttribute("download", `BACKUP.json`);
-                                    document.body.appendChild(link); link.click(); link.remove();
-                                }} className="p-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2"><Download className="w-4 h-4" /> 전체 JSON 데이터 백업 다운로드</button>
-                            </div>
-                        )}
-                    </main>
-
-                    {/* 모바일용 하단 메뉴 */}
-                    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 z-40 px-2 py-2 flex justify-around items-center">
-                        {navItems.map(item => {
-                            const IconComponent = item.icon; 
-                            const isActive = activeTab === item.id;
-                            return (
-                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1 p-1.5 rounded-xl relative ${isActive ? 'text-purple-400 font-bold' : 'text-slate-400'}`}>
-                                    <IconComponent className="w-5 h-5" /><span className="text-[10px]">{item.label}</span>
-                                    {item.badge > 0 && <span className="absolute top-0 right-1 w-4 h-4 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center">{item.badge}</span>}
-                                </button>
-                            );
-                        })}
-                    </nav>
-                </div>
-            );
-        }
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
-"""
-
-# HTML을 전체 화면(높이 1000px 이상, 스크롤 가능)으로 렌더링
-components.html(react_html_code, height=1200, scrolling=True)
+# --- [메뉴 8] 데이터 백업 ---
+elif menu == "💾 데이터 백업":
+    st.markdown("## 💾 안전한 데이터 백업 (JSON)")
+    st.write("입력하신 모든 운행 및 지출 데이터를 파일로 안전하게 백업합니다.")
+    
+    backup_data = {
+        "trips": st.session_state.trips,
+        "expenses": st.session_state.expenses
+    }
+    json_str = json.dumps(backup_data, ensure_ascii=False, indent=2)
+    
+    st.download_button(
+        label="📥 전체 백업 데이터 다운로드 (.json)",
+        data=json_str,
+        file_name=f"DRIVER_MONEY_BACKUP_20261107.json",
+        mime="application/json",
+        use_container_width=True
+    )
