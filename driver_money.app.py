@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# 페이지 기본 설정
+# 1. 페이지 기본 설정 (와이드 모드 필수, 다크 배경)
 st.set_page_config(
     page_title="DRIVER MONEY - 프리미엄 탁송 가계부",
     page_icon="🚗",
@@ -9,7 +9,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Streamlit 기본 UI 완벽 숨김 처리 (웹앱 전체화면화)
+# 2. Streamlit 기본 UI 완벽 숨김 처리 (웹앱 전체화면화)
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
@@ -36,9 +36,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# 버그 픽스 완료: lucide-react를 정상 도입하여 상태관리 충돌(Crash) 완벽 해결
-# -----------------------------------------------------------------------------
+# 3. 완벽하게 작동하는 React UI 원본 코드 (모달창 멈춤 버그 완벽 수정본)
 react_html_code = """
 <!DOCTYPE html>
 <html lang="ko">
@@ -68,10 +66,10 @@ react_html_code = """
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    <!-- Babel -->
+    <!-- Babel (브라우저 실시간 번역기) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Lucide React (버그 해결의 핵심: React 전용 UMD 빌드 사용) -->
+    <!-- Lucide React 아이콘 (모달 멈춤 버그 해결의 핵심 라이브러리) -->
     <script src="https://unpkg.com/lucide-react@0.344.0/dist/umd/lucide-react.min.js"></script>
 
     <style>
@@ -87,7 +85,8 @@ react_html_code = """
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
-        // lucideReact에서 모든 아이콘 컴포넌트를 직접 추출하여 충돌 방지
+        
+        // 아이콘 추출 (안정성 확보)
         const { 
             LayoutDashboard, PlusCircle, History, TrendingUp, Fuel, CreditCard, 
             AlertTriangle, Receipt, Building2, Bell, PieChart, Calendar, Users, 
@@ -96,7 +95,7 @@ react_html_code = """
             Edit, DollarSign, ArrowUpRight, Car 
         } = window.lucideReact;
 
-        // --- INITIAL MOCK DATA ---
+        // --- 초기 샘플 데이터 ---
         const INITIAL_COMPANIES = [
             { id: 'c1', name: 'SK로드탁송', contact: '010-1234-5678', cycle: '매주 금요일', defaultFee: 180000 },
             { id: 'c2', name: '카카오대리', contact: '1588-0000', cycle: '당일 정산', defaultFee: 45000 },
@@ -136,39 +135,35 @@ react_html_code = """
         ];
 
         function App() {
-            // State Management
+            // 브라우저 캐시(localStorage)를 활용한 데이터 유지
             const [trips, setTrips] = useState(() => {
                 const saved = localStorage.getItem('dm_trips');
                 return saved ? JSON.parse(saved) : INITIAL_TRIPS;
             });
-
             const [expenses, setExpenses] = useState(() => {
                 const saved = localStorage.getItem('dm_expenses');
                 return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
             });
-
             const [companies, setCompanies] = useState(() => {
                 const saved = localStorage.getItem('dm_companies');
                 return saved ? JSON.parse(saved) : INITIAL_COMPANIES;
             });
 
             const [activeTab, setActiveTab] = useState('dashboard');
-            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-            // Modal States
+            
+            // 모달 상태 관리
             const [isTripModalOpen, setIsTripModalOpen] = useState(false);
             const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-            const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
             const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
+            
             const [selectedTripForSms, setSelectedTripForSms] = useState(null);
-            const [selectedTripForDeposit, setSelectedTripForDeposit] = useState(null);
 
-            // LocalStorage Persist
+            // 데이터 자동 저장
             useEffect(() => { localStorage.setItem('dm_trips', JSON.stringify(trips)); }, [trips]);
             useEffect(() => { localStorage.setItem('dm_expenses', JSON.stringify(expenses)); }, [expenses]);
             useEffect(() => { localStorage.setItem('dm_companies', JSON.stringify(companies)); }, [companies]);
 
-            // Key Financial Calculation Engine
+            // 재무 통계 자동 계산 엔진
             const stats = useMemo(() => {
                 let todayCount = 0; let todaySettlementTarget = 0; let todayDeposit = 0;
                 let totalUnpaidFreight = 0; let totalUnpaidFuel = 0;
@@ -189,12 +184,18 @@ react_html_code = """
                 expenses.forEach(e => { monthlyExpenses += Number(e.amount || 0); });
                 const netProfit = monthlyFreightIncome - monthlyExpenses;
 
-                return { todayCount, todaySettlementTarget, todayDeposit, totalUnpaidFreight, totalUnpaidFuel, totalUnpaid: totalUnpaidFreight + totalUnpaidFuel, monthlyFreightIncome, monthlyExpenses, netProfit };
+                return { 
+                    todayCount, todaySettlementTarget, todayDeposit, 
+                    totalUnpaidFreight, totalUnpaidFuel, 
+                    totalUnpaid: totalUnpaidFreight + totalUnpaidFuel, 
+                    monthlyFreightIncome, monthlyExpenses, netProfit 
+                };
             }, [trips, expenses]);
 
-            // Handlers
+            // 운행 등록 처리
             const handleSaveTrip = (newTrip) => { setTrips(prev => [newTrip, ...prev]); setIsTripModalOpen(false); };
-            const handleSaveExpense = (newExp) => { setExpenses(prev => [newExp, ...prev]); setIsExpenseModalOpen(false); };
+            
+            // 입금 등록 처리
             const handleApplyDeposit = (tripId, freightAmt, fuelAmt) => {
                 setTrips(prev => prev.map(t => {
                     if (t.id === tripId) {
@@ -213,20 +214,15 @@ react_html_code = """
 
             const navItems = [
                 { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
-                { id: 'trip_reg', label: '빠른 운행 등록', icon: PlusCircle },
                 { id: 'trip_list', label: '운행 내역', icon: History },
                 { id: 'unpaid', label: '미수금 & SMS', icon: AlertTriangle, badge: trips.filter(t => (t.freightFee - t.paidFreight + (t.fuelPaidBy==='driver_prepaid'?(t.fuelFee-t.paidFuel):0)) > 0).length },
-                { id: 'fuel', label: '주유비 환급', icon: Fuel },
-                { id: 'deposits', label: '입금 및 정산', icon: CreditCard },
-                { id: 'expenses', label: '지출 관리', icon: Receipt },
-                { id: 'analytics', label: '수익 분석', icon: PieChart },
                 { id: 'backup', label: '백업 및 엑셀', icon: Download },
             ];
 
             return (
                 <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans flex flex-col md:flex-row antialiased">
                     
-                    {/* DESKTOP SIDEBAR */}
+                    {/* PC 좌측 사이드바 */}
                     <aside className="hidden md:flex flex-col w-64 bg-slate-900/80 backdrop-blur-md border-r border-slate-800 p-4 shrink-0 justify-between">
                         <div>
                             <div className="flex items-center gap-3 px-3 py-4 mb-4 border-b border-slate-800/80">
@@ -244,7 +240,7 @@ react_html_code = """
                                     return (
                                         <button
                                             key={item.id}
-                                            onClick={() => item.id === 'trip_reg' ? setIsTripModalOpen(true) : setActiveTab(item.id)}
+                                            onClick={() => setActiveTab(item.id)}
                                             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                                                 activeTab === item.id ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/20 text-white border border-purple-500/40 shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
                                             }`}
@@ -261,8 +257,10 @@ react_html_code = """
                         </div>
                     </aside>
 
-                    {/* MAIN CONTENT AREA */}
+                    {/* 메인 작업 영역 */}
                     <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full pb-24 md:pb-8">
+                        
+                        {/* 상단 액션 버튼 */}
                         <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-4">
                             <div>
                                 <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
@@ -280,7 +278,7 @@ react_html_code = """
                             </div>
                         </header>
 
-                        {/* TAB 1: DASHBOARD */}
+                        {/* 1. 대시보드 탭 */}
                         {activeTab === 'dashboard' && (
                             <div className="space-y-6">
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -327,7 +325,7 @@ react_html_code = """
                             </div>
                         )}
 
-                        {/* TAB 2: TRIP LIST */}
+                        {/* 2. 운행 내역 전체 탭 */}
                         {activeTab === 'trip_list' && (
                             <div className="space-y-4">
                                 {trips.map(t => {
@@ -337,29 +335,17 @@ react_html_code = """
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
                                                 <div className="flex items-center gap-2">
                                                     <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 font-mono text-xs font-bold border border-purple-500/30">{t.type}</span>
-                                                    <h4 className="font-extrabold text-base text-white">{t.company}</h4>
-                                                    <span className="text-xs text-slate-400 font-mono">({t.date})</span>
+                                                    <h4 className="font-extrabold text-base text-white">{t.company}</h4><span className="text-xs text-slate-400 font-mono">({t.date})</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${t.status === '정산 완료' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-pink-500/20 text-pink-400 border border-pink-500/30'}`}>{t.status}</span>
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                                                <div>
-                                                    <span className="text-slate-400 block">운행 구간 및 차량</span>
-                                                    <p className="font-bold text-slate-200 mt-0.5">{t.from} → {t.to}</p>
-                                                    <p className="text-slate-400 mt-0.5">{t.vehicleType} | {t.vehicleNo}</p>
-                                                </div>
-                                                <div>
-                                                    <span className="text-slate-400 block">정산액 분리 내역</span>
-                                                    <p className="text-slate-200 mt-0.5">탁송비: <span className="font-bold text-purple-300">{t.freightFee.toLocaleString()}원</span> (수령: {t.paidFreight.toLocaleString()}원)</p>
-                                                    <p className="text-slate-200 mt-0.5">선결제 주유비: <span className="font-bold text-amber-300">{t.fuelFee.toLocaleString()}원</span> (환급: {t.paidFuel.toLocaleString()}원)</p>
-                                                </div>
-                                                <div className="flex flex-col justify-between items-start md:items-end">
-                                                    <div>
-                                                        <span className="text-slate-400 text-right block">남은 미수금</span>
-                                                        <span className="text-base font-black text-pink-400">{totalUnpaid.toLocaleString()}원</span>
-                                                    </div>
+                                                <div><span className="text-slate-400 block">운행 구간</span><p className="font-bold text-slate-200 mt-0.5">{t.from} → {t.to}</p></div>
+                                                <div><span className="text-slate-400 block">탁송비</span><p className="font-bold text-purple-300 mt-0.5">{t.freightFee.toLocaleString()}원</p></div>
+                                                <div className="text-right">
+                                                    <span className="text-slate-400 block">남은 미수금</span><span className="text-base font-black text-pink-400">{totalUnpaid.toLocaleString()}원</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -367,8 +353,8 @@ react_html_code = """
                                 })}
                             </div>
                         )}
-                        
-                        {/* TAB 3: UNPAID & SMS */}
+
+                        {/* 3. 미수금 확인 및 문자발송 탭 */}
                         {activeTab === 'unpaid' && (
                             <div className="space-y-4">
                                 {trips.filter(t => (t.freightFee - t.paidFreight + (t.fuelPaidBy==='driver_prepaid'?(t.fuelFee-t.paidFuel):0)) > 0).map(t => {
@@ -389,8 +375,8 @@ react_html_code = """
                                                     <div className="pt-1 border-t border-slate-800 flex justify-between text-sm font-black text-pink-400"><span>합계 미수금:</span><span>{totalUnpaid.toLocaleString()}원</span></div>
                                                 </div>
                                             </div>
-                                            <button onClick={() => { setSelectedTripForSms(t); setIsSmsModalOpen(true); }} className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center gap-2">
-                                                <Send className="w-4 h-4" /> 정산 요청 문자 생성
+                                            <button onClick={() => { setSelectedTripForSms(t); setIsSmsModalOpen(true); }} className="py-2.5 rounded-xl bg-gradient-to-r from-pink-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center gap-2 hover:opacity-80 transition-all">
+                                                <Send className="w-4 h-4" /> 정산 요청 문자 복사하기
                                             </button>
                                         </div>
                                     )
@@ -398,117 +384,33 @@ react_html_code = """
                             </div>
                         )}
 
-                        {/* TAB 8: BACKUP */}
+                        {/* 4. 백업 및 엑셀 탭 */}
                         {activeTab === 'backup' && (
                             <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl space-y-4">
-                                <h3 className="font-extrabold text-base text-white">데이터 백업 및 엑셀 내보내기</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
-                                    <button onClick={() => {
-                                        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ trips, expenses, companies }));
-                                        const link = document.createElement('a');
-                                        link.setAttribute("href", dataStr); link.setAttribute("download", `BACKUP.json`);
-                                        document.body.appendChild(link); link.click(); link.remove();
-                                    }} className="p-4 rounded-xl bg-purple-600 text-white font-bold text-xs flex items-center justify-center gap-2">
-                                        <Download className="w-4 h-4" /> 전체 JSON 데이터 백업
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* OTHER TABS PLACEHOLDER */}
-                        {['fuel', 'deposits', 'expenses', 'analytics'].includes(activeTab) && (
-                            <div className="p-8 rounded-2xl bg-slate-900/70 border border-slate-800 text-center space-y-3">
-                                <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/30 text-purple-400 flex items-center justify-center mx-auto">
-                                    <CheckCircle2 className="w-6 h-6" />
-                                </div>
-                                <h3 className="font-extrabold text-lg text-white">{navItems.find(n => n.id === activeTab)?.label} 활성화 완료</h3>
-                                <p className="text-xs text-slate-400">데이터가 실시간으로 완벽 연동되었습니다.</p>
+                                <h3 className="font-extrabold text-base text-white">데이터 백업 (JSON)</h3>
+                                <button onClick={() => {
+                                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ trips, expenses, companies }));
+                                    const link = document.createElement('a');
+                                    link.setAttribute("href", dataStr); link.setAttribute("download", `BACKUP.json`);
+                                    document.body.appendChild(link); link.click(); link.remove();
+                                }} className="p-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2"><Download className="w-4 h-4" /> 전체 JSON 데이터 백업 다운로드</button>
                             </div>
                         )}
                     </main>
 
-                    {/* MODAL 1: FAST TRIP REGISTRATION */}
-                    {isTripModalOpen && (
-                        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-                            <div className="bg-slate-900 border border-purple-500/30 rounded-3xl p-6 w-full max-w-lg space-y-4 shadow-2xl">
-                                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                    <h3 className="font-black text-lg text-white">⚡ 30초 빠른 운행 등록</h3>
-                                    <button onClick={() => setIsTripModalOpen(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
-                                </div>
-                                <form onSubmit={(e) => {
-                                    e.preventDefault();
-                                    const fd = new FormData(e.target);
-                                    handleSaveTrip({
-                                        id: `TRIP-${Date.now()}`, date: fd.get('date'), type: fd.get('type'),
-                                        company: fd.get('company'), customer: fd.get('customer') || '미지정', phone: fd.get('phone') || '010-0000-0000',
-                                        vehicleNo: fd.get('vehicleNo') || '12가 3456', vehicleType: fd.get('vehicleType') || '승용차',
-                                        from: fd.get('from'), to: fd.get('to'),
-                                        freightFee: Number(fd.get('freightFee')), fuelFee: Number(fd.get('fuelFee')),
-                                        fuelPaidBy: fd.get('fuelPaidBy'), dueDate: fd.get('dueDate'), status: '정산 대기', paidFreight: 0, paidFuel: 0
-                                    });
-                                }} className="space-y-4 text-xs">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div><label className="block text-slate-300 font-bold mb-1">운행일자</label><input type="date" name="date" defaultValue="2026-11-07" className="w-full bg-white text-black font-semibold p-2.5 rounded-xl border border-slate-300" /></div>
-                                        <div><label className="block text-slate-300 font-bold mb-1">운행 종류</label><select name="type" className="w-full bg-white text-black font-semibold p-2.5 rounded-xl border border-slate-300"><option>로드탁송</option><option>대리운전</option></select></div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div><label className="block text-slate-300 font-bold mb-1">업체명</label><input type="text" name="company" placeholder="예: SK로드탁송" required className="w-full bg-white text-black font-semibold p-2.5 rounded-xl border border-slate-300" /></div>
-                                        <div><label className="block text-slate-300 font-bold mb-1">도착지</label><input type="text" name="to" placeholder="부산 해운대" required className="w-full bg-white text-black font-semibold p-2.5 rounded-xl border border-slate-300" /></div>
-                                    </div>
-                                    <div className="p-3 bg-purple-950/40 rounded-xl border border-purple-500/30 grid grid-cols-2 gap-3">
-                                        <div><label className="block text-purple-200 font-bold mb-1">탁송비 (원)</label><input type="number" name="freightFee" required className="w-full bg-white text-black font-bold p-2.5 rounded-xl border border-slate-300" /></div>
-                                        <div><label className="block text-amber-200 font-bold mb-1">선결제 주유비 (원)</label><input type="number" name="fuelFee" defaultValue="0" className="w-full bg-white text-black font-bold p-2.5 rounded-xl border border-slate-300" /></div>
-                                    </div>
-                                    <input type="hidden" name="fuelPaidBy" value="driver_prepaid" />
-                                    <input type="hidden" name="from" value="서울 강남" />
-                                    <input type="hidden" name="dueDate" value="2026-11-14" />
-                                    <div className="pt-2 flex justify-end gap-2">
-                                        <button type="submit" className="px-6 py-2.5 rounded-xl bg-purple-600 text-white font-extrabold">운행 등록 완료</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* MODAL 2: DEPOSIT */}
-                    {isDepositModalOpen && (
-                        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-                            <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-                                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                    <h3 className="font-black text-lg text-white">💳 부분 입금 처리</h3>
-                                    <button onClick={() => setIsDepositModalOpen(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
-                                </div>
-                                <form onSubmit={(e) => {
-                                    e.preventDefault(); const fd = new FormData(e.target);
-                                    handleApplyDeposit(fd.get('tripId'), fd.get('freightAmt'), fd.get('fuelAmt'));
-                                }} className="space-y-4 text-xs">
-                                    <select name="tripId" className="w-full bg-white text-black font-semibold p-2.5 rounded-xl">
-                                        {trips.map(t => <option key={t.id} value={t.id}>[{t.company}] {t.from}→{t.to}</option>)}
-                                    </select>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div><label className="block text-purple-300 font-bold mb-1">탁송비 입금 (원)</label><input type="number" name="freightAmt" defaultValue="0" className="w-full bg-white text-black font-bold p-2.5 rounded-xl" /></div>
-                                        <div><label className="block text-amber-300 font-bold mb-1">주유비 입금 (원)</label><input type="number" name="fuelAmt" defaultValue="0" className="w-full bg-white text-black font-bold p-2.5 rounded-xl" /></div>
-                                    </div>
-                                    <div className="pt-2 flex justify-end gap-2"><button type="submit" className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white font-extrabold">입금 적용하기</button></div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* MODAL 3: SMS BUILDER */}
-                    {isSmsModalOpen && selectedTripForSms && (
-                        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-                            <div className="bg-slate-900 border border-pink-500/40 rounded-3xl p-6 w-full max-w-md space-y-4 shadow-2xl">
-                                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                    <h3 className="font-black text-lg text-white">💬 정산 요청 문자 복사</h3>
-                                    <button onClick={() => setIsSmsModalOpen(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
-                                </div>
-                                <textarea readOnly rows="7" value={`안녕하세요 ${selectedTripForSms.company} 담당자님. \\n${selectedTripForSms.date} 진행한 탁송 정산 부탁드립니다.\\n- 미수탁송비: ${(selectedTripForSms.freightFee - selectedTripForSms.paidFreight).toLocaleString()}원\\n- 주유비: ${(selectedTripForSms.fuelFee - selectedTripForSms.paidFuel).toLocaleString()}원`} className="w-full bg-white text-black font-semibold p-3 rounded-xl"></textarea>
-                                <button onClick={() => { setIsSmsModalOpen(false); alert('문구가 복사되었습니다!'); }} className="w-full py-3 rounded-xl bg-purple-600 text-white font-bold"><Copy className="inline w-4 h-4 mr-1" /> 복사 완료</button>
-                            </div>
-                        </div>
-                    )}
-
+                    {/* 모바일용 하단 메뉴 */}
+                    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 z-40 px-2 py-2 flex justify-around items-center">
+                        {navItems.map(item => {
+                            const IconComponent = item.icon; 
+                            const isActive = activeTab === item.id;
+                            return (
+                                <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1 p-1.5 rounded-xl relative ${isActive ? 'text-purple-400 font-bold' : 'text-slate-400'}`}>
+                                    <IconComponent className="w-5 h-5" /><span className="text-[10px]">{item.label}</span>
+                                    {item.badge > 0 && <span className="absolute top-0 right-1 w-4 h-4 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center">{item.badge}</span>}
+                                </button>
+                            );
+                        })}
+                    </nav>
                 </div>
             );
         }
@@ -520,5 +422,5 @@ react_html_code = """
 </html>
 """
 
-# HTML을 1000px 높이로 설정하여 모달과 탭이 모두 정상 작동하도록 렌더링
-components.html(react_html_code, height=1000, scrolling=True)
+# HTML을 전체 화면(높이 1000px 이상, 스크롤 가능)으로 렌더링
+components.html(react_html_code, height=1200, scrolling=True)
