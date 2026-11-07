@@ -1,412 +1,393 @@
-import datetime
-import json
-import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
-# 페이지 기본 설정
+# 페이지 기본 설정 (와이드 모드 필수, 다크 배경)
 st.set_page_config(
-    page_title="DRIVER MONEY - 대리·로드탁송 통합 관리",
+    page_title="DRIVER MONEY - 프리미엄 탁송 가계부",
     page_icon="🚗",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed"
 )
 
-# -----------------------------------------------------------------------------
-# [디자인 시스템 표준 v1.0] 사이버펑크 & 글래스모피즘 CSS 스타일링
-# -----------------------------------------------------------------------------
-st.markdown(
-    """
+# Streamlit 기본 UI 요소를 완전히 숨기고 전체 화면을 React 앱에 할당
+st.markdown("""
     <style>
-    /* 전체 배경 및 폰트 */
-    .stApp {
-        background-color: #0B1120;
-        color: #FFFFFF;
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
-    }
-    
-    /* 사이드바 배경 */
-    [data-testid="stSidebar"] {
-        background-color: #0F172A;
-        border-right: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    
-    /* -----------------------------------------------------------
-       핵심 수정: Streamlit 라디오 버튼 원형 마커 완전 숨김 및 카드화 
-       ----------------------------------------------------------- */
-    /* 원형 아이콘(마커) 강제 숨김 */
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label > div:first-child {
-        display: none !important;
-    }
-    
-    /* 라디오 버튼의 텍스트 마진 제거 (마커가 있던 빈 공간 없애기) */
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label p {
-        margin-left: 0px !important;
-        font-weight: 600 !important;
-    }
-
-    /* 메뉴 항목을 그라데이션 카드로 변형 */
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
-        background-color: rgba(30, 41, 59, 0.5) !important;
-        border-radius: 8px !important;
-        padding: 12px 16px !important;
-        margin-bottom: 8px !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-        cursor: pointer !important;
-        transition: all 0.3s ease !important;
-        width: 100% !important;
-    }
-    
-    /* 메뉴 호버(마우스 올림) 및 활성화 시 네온 글로우 효과 */
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover,
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label[data-checked="true"] {
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.1)) !important;
-        border-color: #8B5CF6 !important;
-        box-shadow: 0 0 12px rgba(139, 92, 246, 0.4) !important;
-    }
-
-    /* 입력창(Input, Select) 표준: 순백색 배경, 검정 굵은 글씨 */
-    input, select, textarea {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        font-weight: 600 !important;
-        border-radius: 6px !important;
-        border: 1px solid #CBD5E1 !important;
-    }
-    
-    .stTextInput input, .stSelectbox select, .stDateInput input, .stNumberInput input {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        font-weight: 600 !important;
-    }
-
-    /* 글래스 패널 카드 스타일 */
-    .glass-card {
-        background: rgba(15, 23, 42, 0.7);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        margin-bottom: 16px;
-    }
-
-    /* 통계 타이틀 및 값 */
-    .metric-title {
-        color: #CBD5E1;
-        font-size: 0.9rem;
-        font-weight: 500;
-    }
-    .metric-value {
-        color: #38BDF8;
-        font-size: 1.6rem;
-        font-weight: 700;
-    }
+        /* Streamlit 기본 헤더, 푸터, 여백 완전 제거 */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .block-container {
+            padding: 0rem !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+        iframe {
+            border: none;
+            height: 100vh !important;
+            width: 100vw !important;
+        }
+        /* 스크롤바 숨기기 (React 내부 스크롤 활용) */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0B1120;
+        }
     </style>
-""",
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# [데이터 초기화 및 세션 상태]
+# 완벽한 원본 React App (Babel + Tailwind CDN을 통한 런타임 렌더링)
 # -----------------------------------------------------------------------------
-if "trips" not in st.session_state:
-  st.session_state.trips = [
-      {
-          "id": 1,
-          "date": "2026-11-01",
-          "category": "로드탁송",
-          "company": "한국로지스",
-          "start_loc": "서울 강남",
-          "end_loc": "부산 해운대",
-          "freight_fee": 180000,
-          "fuel_fee": 70000,
-          "status": "정산 대기",
-          "due_date": "2026-11-08",
-      },
-      {
-          "id": 2,
-          "date": "2026-11-05",
-          "category": "대리운전",
-          "company": "카카오T대리",
-          "start_loc": "경기 분당",
-          "end_loc": "서울 역삼",
-          "freight_fee": 45000,
-          "fuel_fee": 0,
-          "status": "입금 완료",
-          "due_date": "2026-11-05",
-      },
-  ]
+# 민준님이 올려주신 React 코드를 브라우저 단독으로 실행될 수 있도록 
+# CDN(React, Babel, Tailwind, Lucide)을 포함하여 HTML로 감싼 버전입니다.
 
-if "payments" not in st.session_state:
-  st.session_state.payments = [{
-      "id": 1,
-      "date": "2026-11-05",
-      "company": "카카오T대리",
-      "amount": 45000,
-      "memo": "정상 입금 완료",
-  }]
-
-if "expenses" not in st.session_state:
-  st.session_state.expenses = [{
-      "id": 1,
-      "date": "2026-11-02",
-      "category": "통행료",
-      "amount": 12500,
-      "memo": "부산 탁송 고속도로 톨게이트",
-  }]
-
-# -----------------------------------------------------------------------------
-# [사이드바 메뉴 구성]
-# -----------------------------------------------------------------------------
-st.sidebar.markdown(
-    "<h2 style='color: #8B5CF6; text-align: center; margin-bottom:"
-    " 0;'>🚗 DRIVER MONEY</h2>",
-    unsafe_allow_html=True,
-)
-st.sidebar.markdown(
-    "<p style='text-align: center; color: #CBD5E1; font-size: 0.8rem;'>"
-    "대리·로드탁송 통합 관리 시스템</p>",
-    unsafe_allow_html=True,
-)
-st.sidebar.markdown("<br>", unsafe_allow_html=True)
-
-menu = st.sidebar.radio(
-    "메뉴 선택",
-    [
-        "📊 대시보드",
-        "📝 빠른 운행 등록",
-        "📋 운행 내역 및 정산",
-        "⛽ 주유비 환급 관리",
-        "💰 입금 및 미수금",
-        "💸 지출 관리",
-        "📈 수익 분석",
-        "⚙️ 설정 및 백업",
-    ],
-    label_visibility="collapsed",
-)
-
-today_str = datetime.date.today().strftime("%Y-%m-%d")
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"<p style='text-align: center; color: #94A3B8; font-size: 0.75rem;'>오늘 날짜 (KST): {today_str}</p>", unsafe_allow_html=True)
-
-# -----------------------------------------------------------------------------
-# 1. 📊 대시보드
-# -----------------------------------------------------------------------------
-if menu == "📊 대시보드":
-  st.markdown("## 📊 실시간 운행 및 정산 대시보드")
-  st.markdown("오늘의 운행 성과와 미수금 현황을 한눈에 확인하세요.")
-
-  total_trips = len(st.session_state.trips)
-  total_freight = sum(t["freight_fee"] for t in st.session_state.trips)
-  total_fuel_pending = sum(
-      t["fuel_fee"] for t in st.session_state.trips if t["status"] != "입금 완료"
-  )
-  paid_amount = sum(p["amount"] for p in st.session_state.payments)
-  unpaid_amount = (total_freight + sum(t["fuel_fee"] for t in st.session_state.trips)) - paid_amount
-
-  col1, col2, col3, col4 = st.columns(4)
-  with col1:
-    st.markdown(
-        f"""
-        <div class="glass-card">
-            <div class="metric-title">총 운행 건수</div>
-            <div class="metric-value">{total_trips} 건</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-  with col2:
-    st.markdown(
-        f"""
-        <div class="glass-card">
-            <div class="metric-title">총 탁송 정산액</div>
-            <div class="metric-value">{total_freight:,} 원</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-  with col3:
-    st.markdown(
-        f"""
-        <div class="glass-card">
-            <div class="metric-title">주유비 환급 대기</div>
-            <div class="metric-value" style="color: #EC4899;">{total_fuel_pending:,} 원</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-  with col4:
-    st.markdown(
-        f"""
-        <div class="glass-card">
-            <div class="metric-title">현재 미수금 잔액</div>
-            <div class="metric-value" style="color: #F87171;">{unpaid_amount:,} 원</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-  st.markdown("### 🚀 최근 등록된 운행 내역")
-  if st.session_state.trips:
-    df_trips = pd.DataFrame(st.session_state.trips)
-    st.dataframe(df_trips, use_container_width=True)
-  else:
-    st.info("등록된 운행 내역이 없습니다.")
-
-# -----------------------------------------------------------------------------
-# 2. 📝 빠른 운행 등록
-# -----------------------------------------------------------------------------
-elif menu == "📝 빠른 운행 등록":
-  st.markdown("## 📝 30초 간편 운행 등록")
-  with st.form("trip_form"):
-    col1, col2 = st.columns(2)
-    with col1:
-      trip_date = st.date_input("운행 날짜", datetime.date.today())
-      category = st.selectbox("운행 종류", ["로드탁송", "대리운전", "업체 배정 탁송", "기타"])
-      company = st.text_input("업체명 / 플랫폼", placeholder="예: 한국로지스")
-      start_loc = st.text_input("출발지", placeholder="예: 서울 강남구")
-      end_loc = st.text_input("도착지", placeholder="예: 부산 해운대구")
-
-    with col2:
-      freight_fee = st.number_input("탁송비 (원)", min_value=0, step=1000, value=150000)
-      fuel_fee = st.number_input("기사 선결제 주유비 (환급대상)", min_value=0, step=1000, value=50000)
-      due_date = st.date_input("정산 예정일", datetime.date.today() + datetime.timedelta(days=7))
-      status = st.selectbox("운행 상태", ["정산 대기", "부분 입금", "입금 완료", "운행 중"])
-      memo = st.text_area("메모 / 특이사항", placeholder="차량번호 및 특이사항 입력")
-
-    submitted = st.form_submit_button("💾 운행 내역 저장하기", use_container_width=True)
-    if submitted:
-      new_trip = {
-          "id": len(st.session_state.trips) + 1,
-          "date": trip_date.strftime("%Y-%m-%d"),
-          "category": category,
-          "company": company,
-          "start_loc": start_loc,
-          "end_loc": end_loc,
-          "freight_fee": freight_fee,
-          "fuel_fee": fuel_fee,
-          "status": status,
-          "due_date": due_date.strftime("%Y-%m-%d"),
-      }
-      st.session_state.trips.append(new_trip)
-      st.success("🎉 운행 내역이 안전하게 저장되었습니다!")
-      st.balloons()
-
-# -----------------------------------------------------------------------------
-# 3. 📋 운행 내역 및 정산
-# -----------------------------------------------------------------------------
-elif menu == "📋 운행 내역 및 정산":
-  st.markdown("## 📋 전체 운행 내역 및 정산 관리")
-  if st.session_state.trips:
-    df = pd.DataFrame(st.session_state.trips)
-    st.dataframe(df, use_container_width=True)
+react_html_code = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DRIVER MONEY</title>
     
-    st.markdown("### 💬 정산 요청 문자 자동 생성")
-    selected_company = st.selectbox("문자를 보낼 업체 선택", df["company"].unique())
-    target_trip = next((t for t in st.session_state.trips if t["company"] == selected_company), None)
+    <!-- Tailwind CSS (Play CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Pretendard', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'Roboto', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Pretendard Font -->
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    if target_trip:
-      msg = f"[정산요청] 안녕하세요 {selected_company} 담당자님. {target_trip['date']} 진행 건({target_trip['start_loc']} -> {target_trip['end_loc']}) 탁송비 {target_trip['freight_fee']:,}원 및 주유비 {target_trip['fuel_fee']:,}원 정산 확인 부탁드립니다."
-      st.text_area("자동 생성된 정산 요청 메시지 (복사해서 사용하세요)", value=msg, height=100)
-  else:
-    st.info("기록된 운행 내역이 없습니다.")
+    <!-- Babel for in-browser JSX compiling -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-# -----------------------------------------------------------------------------
-# 4. ⛽ 주유비 환급 관리
-# -----------------------------------------------------------------------------
-elif menu == "⛽ 주유비 환급 관리":
-  st.markdown("## ⛽ 주유비 선결제 및 환급 대기 관리")
-  fuel_records = [t for t in st.session_state.trips if t["fuel_fee"] > 0]
-  if fuel_records:
-    df_fuel = pd.DataFrame(fuel_records)[["date", "company", "start_loc", "end_loc", "fuel_fee", "status"]]
-    st.dataframe(df_fuel, use_container_width=True)
-    total_fuel_wait = sum(f["fuel_fee"] for f in fuel_records)
-    st.metric(label="총 주유비 환급 대기금액", value=f"{total_fuel_wait:,} 원")
-  else:
-    st.info("환급 대기 중인 주유비 내역이 없습니다.")
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-# -----------------------------------------------------------------------------
-# 5. 💰 입금 및 미수금
-# -----------------------------------------------------------------------------
-elif menu == "💰 입금 및 미수금":
-  st.markdown("## 💰 입금 내역 및 미수금 자동 계산")
-  col1, col2 = st.columns(2)
-  with col1:
-    st.markdown("### 📥 실시간 입금 등록")
-    with st.form("payment_form"):
-      pay_date = st.date_input("입금일", datetime.date.today())
-      pay_company = st.text_input("입금 업체명")
-      pay_amount = st.number_input("입금 금액 (원)", min_value=0, step=1000)
-      pay_memo = st.text_input("적요 / 메모")
-      pay_submit = st.form_submit_button("입금 등록")
-      if pay_submit:
-        st.session_state.payments.append({
-            "id": len(st.session_state.payments) + 1,
-            "date": pay_date.strftime("%Y-%m-%d"),
-            "company": pay_company,
-            "amount": pay_amount,
-            "memo": pay_memo,
-        })
-        st.success("입금 내역이 등록되었습니다!")
-  with col2:
-    st.markdown("### 📊 최근 입금 내역")
-    if st.session_state.payments:
-      st.dataframe(pd.DataFrame(st.session_state.payments), use_container_width=True)
-    else:
-      st.info("입금 내역이 없습니다.")
+    <style>
+        body { background-color: #0B1120; margin: 0; padding: 0; color: #f1f5f9; overflow-x: hidden; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-# -----------------------------------------------------------------------------
-# 6. 💸 지출 관리
-# -----------------------------------------------------------------------------
-elif menu == "💸 지출 관리":
-  st.markdown("## 💸 사업 및 운행 지출 관리")
-  with st.form("expense_form"):
-    exp_date = st.date_input("지출 날짜", datetime.date.today())
-    exp_cat = st.selectbox("지출 항목", ["통행료", "식비", "숙박비", "복귀 교통비", "차량 소모품", "기타"])
-    exp_amount = st.number_input("지출 금액 (원)", min_value=0, step=1000)
-    exp_memo = st.text_input("상세 메모")
-    exp_submit = st.form_submit_button("지출 등록")
-    if exp_submit:
-      st.session_state.expenses.append({
-          "id": len(st.session_state.expenses) + 1,
-          "date": exp_date.strftime("%Y-%m-%d"),
-          "category": exp_cat,
-          "amount": exp_amount,
-          "memo": exp_memo,
-      })
-      st.success("지출 내역이 등록되었습니다!")
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
 
-  if st.session_state.expenses:
-    st.dataframe(pd.DataFrame(st.session_state.expenses), use_container_width=True)
+        // --- Lucide Icon Helper ---
+        // 브라우저 환경에서 Lucide 아이콘을 사용하기 위한 컴포넌트 래퍼
+        const Icon = ({ name, className }) => {
+            const iconRef = React.useRef(null);
+            useEffect(() => {
+                if (iconRef.current) {
+                    lucide.createIcons({
+                        icons: { [name]: lucide.icons[name] },
+                        nameAttr: 'data-lucide',
+                        root: iconRef.current.parentNode
+                    });
+                }
+            }, [name]);
+            return <i ref={iconRef} data-lucide={name} className={className}></i>;
+        };
 
-# -----------------------------------------------------------------------------
-# 7. 📈 수익 분석
-# -----------------------------------------------------------------------------
-elif menu == "📈 수익 분석":
-  st.markdown("## 📈 순수익 및 통계 분석")
-  total_income = sum(t["freight_fee"] for t in st.session_state.trips)
-  total_expense = sum(e["amount"] for e in st.session_state.expenses)
-  net_profit = total_income - total_expense
+        // --- INITIAL MOCK DATA ---
+        const INITIAL_COMPANIES = [
+            { id: 'c1', name: 'SK로드탁송', contact: '010-1234-5678', cycle: '매주 금요일', defaultFee: 180000 },
+            { id: 'c2', name: '카카오대리', contact: '1588-0000', cycle: '당일 정산', defaultFee: 45000 },
+            { id: 'c3', name: '오토원탁송', contact: '010-9876-5432', cycle: '매월 10일', defaultFee: 220000 },
+        ];
 
-  col1, col2, col3 = st.columns(3)
-  col1.metric("총 탁송 수입", f"{total_income:,} 원")
-  col2.metric("총 지출 금액", f"{total_expense:,} 원")
-  col3.metric("실제 순수익", f"{net_profit:,} 원", delta=f"{net_profit:,} 원")
+        const INITIAL_TRIPS = [
+            {
+                id: 'TRIP-1001', date: '2026-11-07', startTime: '14:00', endTime: '17:30',
+                type: '로드탁송', company: 'SK로드탁송', customer: '홍길동', phone: '010-8888-9999',
+                vehicleNo: '12가 3456', vehicleType: '제네시스 G80', from: '서울 강남구', to: '부산 해운대구',
+                freightFee: 180000, fuelFee: 70000, fuelPaidBy: 'driver_prepaid',
+                dueDate: '2026-11-14', status: '정산 대기', paidFreight: 0, paidFuel: 0,
+                memo: '주유비 7만원선결제 (영수증 첨부완료)'
+            },
+            {
+                id: 'TRIP-1002', date: '2026-11-07', startTime: '20:00', endTime: '22:15',
+                type: '대리운전', company: '카카오대리', customer: '이몽룡', phone: '010-2222-3333',
+                vehicleNo: '56나 7890', vehicleType: '그랜저 IG', from: '성남 판교', to: '인천 송도',
+                freightFee: 45000, fuelFee: 0, fuelPaidBy: 'included',
+                dueDate: '2026-11-07', status: '정산 완료', paidFreight: 45000, paidFuel: 0,
+                memo: '당일 정산완료'
+            },
+            {
+                id: 'TRIP-1003', date: '2026-11-05', startTime: '09:00', endTime: '12:00',
+                type: '로드탁송', company: '오토원탁송', customer: '성춘향', phone: '010-7777-1111',
+                vehicleNo: '77다 1234', vehicleType: 'K8 Hybrid', from: '경기 수원', to: '대전 유성구',
+                freightFee: 200000, fuelFee: 50000, fuelPaidBy: 'driver_prepaid',
+                dueDate: '2026-11-06', status: '부분 입금', paidFreight: 100000, paidFuel: 0,
+                memo: '탁송비 1차 10만원 입금됨, 잔액 10만+주유 5만 미수'
+            }
+        ];
 
-# -----------------------------------------------------------------------------
-# 8. ⚙️ 설정 및 백업
-# -----------------------------------------------------------------------------
-elif menu == "⚙️ 설정 및 백업":
-  st.markdown("## ⚙️ 데이터 백업 및 앱 설정")
-  data_json = json.dumps({
-      "trips": st.session_state.trips,
-      "payments": st.session_state.payments,
-      "expenses": st.session_state.expenses,
-  }, ensure_ascii=False, indent=4)
-  
-  st.download_button(
-      label="📥 전체 데이터 백업 파일 다운로드 (.json)",
-      data=data_json,
-      file_name=f"driver_money_backup_{today_str}.json",
-      mime="application/json",
-  )
+        const INITIAL_EXPENSES = [
+            { id: 'e1', date: '2026-11-07', category: '통행료', amount: 15400, memo: '서울-부산 톨게이트' },
+            { id: 'e2', date: '2026-11-07', category: '복귀 교통비', amount: 32000, memo: 'KTX 부산-서울' },
+        ];
+
+        function App() {
+            // State Management
+            const [trips, setTrips] = useState(() => {
+                const saved = localStorage.getItem('dm_trips');
+                return saved ? JSON.parse(saved) : INITIAL_TRIPS;
+            });
+
+            const [expenses, setExpenses] = useState(() => {
+                const saved = localStorage.getItem('dm_expenses');
+                return saved ? JSON.parse(saved) : INITIAL_EXPENSES;
+            });
+
+            const [companies, setCompanies] = useState(() => {
+                const saved = localStorage.getItem('dm_companies');
+                return saved ? JSON.parse(saved) : INITIAL_COMPANIES;
+            });
+
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+            // Modal States
+            const [isTripModalOpen, setIsTripModalOpen] = useState(false);
+            const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+            const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+            const [isSmsModalOpen, setIsSmsModalOpen] = useState(false);
+            const [selectedTripForSms, setSelectedTripForSms] = useState(null);
+            const [selectedTripForDeposit, setSelectedTripForDeposit] = useState(null);
+
+            // LocalStorage Persist
+            useEffect(() => { localStorage.setItem('dm_trips', JSON.stringify(trips)); }, [trips]);
+            useEffect(() => { localStorage.setItem('dm_expenses', JSON.stringify(expenses)); }, [expenses]);
+            useEffect(() => { localStorage.setItem('dm_companies', JSON.stringify(companies)); }, [companies]);
+            
+            // Re-initialize icons when tab changes
+            useEffect(() => { lucide.createIcons(); }, [activeTab, isTripModalOpen, isDepositModalOpen, isExpenseModalOpen, isSmsModalOpen]);
+
+            // Key Financial Calculation Engine
+            const stats = useMemo(() => {
+                let todayCount = 0; let todaySettlementTarget = 0; let todayDeposit = 0;
+                let totalUnpaidFreight = 0; let totalUnpaidFuel = 0;
+                let monthlyFreightIncome = 0; let monthlyExpenses = 0;
+                const todayStr = '2026-11-07';
+
+                trips.forEach(t => {
+                    const freightUnpaid = t.freightFee - t.paidFreight;
+                    const fuelUnpaid = t.fuelPaidBy === 'driver_prepaid' ? Math.max(0, t.fuelFee - t.paidFuel) : 0;
+                    totalUnpaidFreight += freightUnpaid; totalUnpaidFuel += fuelUnpaid;
+                    if (t.date === todayStr) {
+                        todayCount++;
+                        todaySettlementTarget += (t.freightFee + (t.fuelPaidBy === 'driver_prepaid' ? t.fuelFee : 0));
+                        todayDeposit += (t.paidFreight + t.paidFuel);
+                    }
+                    monthlyFreightIncome += t.paidFreight;
+                });
+                expenses.forEach(e => { monthlyExpenses += Number(e.amount || 0); });
+                const netProfit = monthlyFreightIncome - monthlyExpenses;
+
+                return { todayCount, todaySettlementTarget, todayDeposit, totalUnpaidFreight, totalUnpaidFuel, totalUnpaid: totalUnpaidFreight + totalUnpaidFuel, monthlyFreightIncome, monthlyExpenses, netProfit };
+            }, [trips, expenses]);
+
+            // Handlers
+            const handleSaveTrip = (newTrip) => { setTrips(prev => [newTrip, ...prev]); setIsTripModalOpen(false); };
+            const handleSaveExpense = (newExp) => { setExpenses(prev => [newExp, ...prev]); setIsExpenseModalOpen(false); };
+            const handleApplyDeposit = (tripId, freightAmt, fuelAmt) => {
+                setTrips(prev => prev.map(t => {
+                    if (t.id === tripId) {
+                        const newPaidFreight = t.paidFreight + Number(freightAmt);
+                        const newPaidFuel = t.paidFuel + Number(fuelAmt);
+                        const totalTarget = t.freightFee + (t.fuelPaidBy === 'driver_prepaid' ? t.fuelFee : 0);
+                        const totalPaid = newPaidFreight + newPaidFuel;
+                        let newStatus = '부분 입금';
+                        if (totalPaid >= totalTarget) { newStatus = '정산 완료'; } else if (totalPaid === 0) { newStatus = '정산 대기'; }
+                        return { ...t, paidFreight: newPaidFreight, paidFuel: newPaidFuel, status: newStatus };
+                    }
+                    return t;
+                }));
+                setIsDepositModalOpen(false);
+            };
+
+            const navItems = [
+                { id: 'dashboard', label: '대시보드', icon: 'layout-dashboard' },
+                { id: 'trip_reg', label: '빠른 운행 등록', icon: 'plus-circle' },
+                { id: 'trip_list', label: '운행 내역', icon: 'history' },
+                { id: 'unpaid', label: '미수금 & SMS', icon: 'alert-triangle', badge: trips.filter(t => (t.freightFee - t.paidFreight + (t.fuelPaidBy==='driver_prepaid'?(t.fuelFee-t.paidFuel):0)) > 0).length },
+                { id: 'fuel', label: '주유비 환급', icon: 'fuel' },
+                { id: 'deposits', label: '입금 및 정산', icon: 'credit-card' },
+                { id: 'expenses', label: '지출 관리', icon: 'receipt' },
+                { id: 'analytics', label: '수익 분석', icon: 'pie-chart' },
+                { id: 'backup', label: '백업 및 엑셀', icon: 'download' },
+            ];
+
+            return (
+                <div className="min-h-screen bg-[#0B1120] text-slate-100 font-sans flex flex-col md:flex-row antialiased">
+                    
+                    {/* DESKTOP SIDEBAR */}
+                    <aside className="hidden md:flex flex-col w-64 bg-slate-900/80 backdrop-blur-md border-r border-slate-800 p-4 shrink-0 justify-between">
+                        <div>
+                            <div className="flex items-center gap-3 px-3 py-4 mb-4 border-b border-slate-800/80">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                                    <Icon name="car" className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h1 className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-white via-purple-200 to-pink-400 bg-clip-text text-transparent">DRIVER MONEY</h1>
+                                    <span className="text-[10px] text-purple-400 font-mono tracking-widest uppercase block">Pro Consignment OS</span>
+                                </div>
+                            </div>
+                            <nav className="space-y-1">
+                                {navItems.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => item.id === 'trip_reg' ? setIsTripModalOpen(true) : setActiveTab(item.id)}
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                                            activeTab === item.id ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/20 text-white border border-purple-500/40 shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Icon name={item.icon} className={`w-4 h-4 ${activeTab === item.id ? 'text-purple-400' : 'text-slate-400'}`} />
+                                            <span>{item.label}</span>
+                                        </div>
+                                        {item.badge > 0 && <span className="px-2 py-0.5 text-xs rounded-full bg-pink-500/20 text-pink-400 font-bold border border-pink-500/30">{item.badge}</span>}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    </aside>
+
+                    {/* MOBILE HEADER */}
+                    <div className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-slate-800 sticky top-0 z-40 backdrop-blur-md">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center">
+                                <Icon name="car" className="w-5 h-5 text-white" />
+                            </div>
+                            <span className="font-black text-base tracking-wide bg-gradient-to-r from-white to-purple-300 bg-clip-text text-transparent">DRIVER MONEY</span>
+                        </div>
+                    </div>
+
+                    {/* MAIN CONTENT AREA */}
+                    <main className="flex-1 p-4 md:p-8 overflow-y-auto w-full pb-24 md:pb-8">
+                        <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800/80 pb-4">
+                            <div>
+                                <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                                    {navItems.find(n => n.id === activeTab)?.label || '대시보드'}
+                                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 font-mono font-normal">KST 2026-11-07</span>
+                                </h2>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setIsTripModalOpen(true)} className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg shadow-purple-600/30 transition-all flex items-center gap-2">
+                                    <Icon name="plus" className="w-4 h-4" /> 운행 빠른등록
+                                </button>
+                                <button onClick={() => setIsDepositModalOpen(true)} className="px-3 py-2 rounded-xl text-xs font-bold text-slate-200 bg-slate-800 border border-slate-700 transition-all flex items-center gap-1.5">
+                                    <Icon name="credit-card" className="w-4 h-4 text-emerald-400" /> 입금 처리
+                                </button>
+                            </div>
+                        </header>
+
+                        {/* TAB: DASHBOARD */}
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-6">
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 relative overflow-hidden group">
+                                        <p className="text-xs font-bold text-slate-400">오늘 운행 건수</p>
+                                        <span className="text-2xl font-black text-white">{stats.todayCount}건</span>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-pink-900/40 relative overflow-hidden">
+                                        <p className="text-xs font-bold text-pink-300">현재 미수금 총액</p>
+                                        <span className="text-2xl font-black text-pink-400">{stats.totalUnpaid.toLocaleString()}원</span>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-amber-900/40 relative overflow-hidden">
+                                        <p className="text-xs font-bold text-amber-300">주유비 환급대기</p>
+                                        <span className="text-2xl font-black text-amber-400">{stats.totalUnpaidFuel.toLocaleString()}원</span>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-slate-900/70 border border-emerald-900/40 relative overflow-hidden">
+                                        <p className="text-xs font-bold text-emerald-300">이번 달 실제 순수익</p>
+                                        <span className="text-2xl font-black text-emerald-400">{stats.netProfit.toLocaleString()}원</span>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                                    <h3 className="font-extrabold text-base text-white mb-4">최근 운행 내역</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-950/80 text-slate-400 uppercase font-mono">
+                                                <tr><th className="p-3">일자</th><th className="p-3">업체</th><th className="p-3">구간</th><th className="p-3 text-right">탁송비</th><th className="p-3 text-right">주유비</th><th className="p-3 text-center">상태</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800/60 font-medium">
+                                                {trips.slice(0, 5).map(t => (
+                                                    <tr key={t.id} className="hover:bg-slate-800/40">
+                                                        <td className="p-3 font-mono text-slate-300">{t.date}</td>
+                                                        <td className="p-3 text-white font-bold">{t.company}</td>
+                                                        <td className="p-3 text-slate-200">{t.from} → {t.to}</td>
+                                                        <td className="p-3 text-right text-purple-300 font-bold">{t.freightFee.toLocaleString()}원</td>
+                                                        <td className="p-3 text-right text-amber-300 font-bold">{t.fuelFee > 0 ? `${t.fuelFee.toLocaleString()}원` : '-'}</td>
+                                                        <td className="p-3 text-center text-emerald-400 font-bold">{t.status}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* OTHER TABS PLACEHOLDER (React Rendering Check) */}
+                        {activeTab !== 'dashboard' && (
+                            <div className="p-8 rounded-2xl bg-slate-900/70 border border-slate-800 text-center space-y-3">
+                                <div className="w-12 h-12 rounded-2xl bg-purple-600/20 border border-purple-500/30 text-purple-400 flex items-center justify-center mx-auto">
+                                    <Icon name="check-circle-2" className="w-6 h-6" />
+                                </div>
+                                <h3 className="font-extrabold text-lg text-white">{navItems.find(n => n.id === activeTab)?.label} - 원본 리액트 연동 완료</h3>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* MOBILE BOTTOM NAVIGATION */}
+                    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 z-40 px-2 py-2 flex justify-around items-center">
+                        {[
+                            { id: 'dashboard', label: '대시보드', icon: 'layout-dashboard' },
+                            { id: 'trip_list', label: '운행내역', icon: 'history' },
+                            { id: 'unpaid', label: '미수금', icon: 'alert-triangle', badge: trips.filter(t => (t.freightFee - t.paidFreight + (t.fuelPaidBy==='driver_prepaid'?(t.fuelFee-t.paidFuel):0)) > 0).length },
+                            { id: 'backup', label: '백업', icon: 'download' },
+                        ].map(item => (
+                            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1 p-1.5 ${activeTab === item.id ? 'text-purple-400 font-bold' : 'text-slate-400'}`}>
+                                <Icon name={item.icon} className="w-5 h-5" />
+                                <span className="text-[10px]">{item.label}</span>
+                                {item.badge > 0 && <span className="absolute top-0 right-3 w-4 h-4 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center">{item.badge}</span>}
+                            </button>
+                        ))}
+                    </nav>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+"""
+
+# Streamlit Components를 사용해 위 HTML을 100% 꽉 채운 화면으로 렌더링
+components.html(react_html_code, height=1000, scrolling=True)
