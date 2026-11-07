@@ -24,24 +24,44 @@ st.markdown(
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
     }
     
-    /* 사이드바 스타일링 및 기본 라디오 마커 숨기기 */
+    /* 사이드바 배경 */
     [data-testid="stSidebar"] {
         background-color: #0F172A;
         border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
     
-    /* Streamlit 라디오 버튼의 동그라미 기본 아이콘 제거 및 깔끔한 배치 */
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
-        background-color: rgba(30, 41, 59, 0.5);
-        border-radius: 8px;
-        padding: 8px 12px;
-        margin-bottom: 6px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        transition: all 0.3s ease;
+    /* -----------------------------------------------------------
+       핵심 수정: Streamlit 라디오 버튼 원형 마커 완전 숨김 및 카드화 
+       ----------------------------------------------------------- */
+    /* 원형 아이콘(마커) 강제 숨김 */
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label > div:first-child {
+        display: none !important;
     }
-    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover {
-        background-color: rgba(139, 92, 246, 0.2);
-        border-color: #8B5CF6;
+    
+    /* 라디오 버튼의 텍스트 마진 제거 (마커가 있던 빈 공간 없애기) */
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label p {
+        margin-left: 0px !important;
+        font-weight: 600 !important;
+    }
+
+    /* 메뉴 항목을 그라데이션 카드로 변형 */
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label {
+        background-color: rgba(30, 41, 59, 0.5) !important;
+        border-radius: 8px !important;
+        padding: 12px 16px !important;
+        margin-bottom: 8px !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        width: 100% !important;
+    }
+    
+    /* 메뉴 호버(마우스 올림) 및 활성화 시 네온 글로우 효과 */
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label:hover,
+    [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label[data-checked="true"] {
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(236, 72, 153, 0.1)) !important;
+        border-color: #8B5CF6 !important;
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.4) !important;
     }
 
     /* 입력창(Input, Select) 표준: 순백색 배경, 검정 굵은 글씨 */
@@ -148,7 +168,7 @@ st.sidebar.markdown(
     "대리·로드탁송 통합 관리 시스템</p>",
     unsafe_allow_html=True,
 )
-st.sidebar.markdown("---")
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
 menu = st.sidebar.radio(
     "메뉴 선택",
